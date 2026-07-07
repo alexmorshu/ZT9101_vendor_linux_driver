@@ -702,7 +702,7 @@ exit:
     return res;
 }
 #endif
-static zt_s32 cfg80211_sta_set_encryption(struct net_device *dev,
+static zt_s32 zt_cfg80211_sta_set_encryption(struct net_device *dev,
         struct cfg80211_crypt *param, zt_u32 param_len)
 {
     ndev_priv_st *pndev_priv = netdev_priv(dev);
@@ -878,7 +878,12 @@ static inline void set_wiphy_pirv(struct wiphy *pwiphy, void *priv)
     *(void **)wiphy_priv(pwiphy) = priv;
 }
 
-static zt_s32 _add_key_cb(struct wiphy *wiphy, struct net_device *ndev,
+static zt_s32 _add_key_cb(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                          struct wireless_dev *wdev,
+#else
+                          struct net_device *ndev,
+#endif
 /*TODO: android #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 119))*/
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
                           int link_id,
@@ -891,11 +896,16 @@ static zt_s32 _add_key_cb(struct wiphy *wiphy, struct net_device *ndev,
 #endif
                           struct key_params *params)
 {
-    ndev_priv_st *pndev_priv = netdev_priv(ndev);
-    nic_info_st *pnic_info = pndev_priv->nic;
+    ndev_priv_st *pndev_priv;
+    nic_info_st *pnic_info;
     zt_u32 param_len;
     struct cfg80211_crypt *param = NULL;
     zt_s32 res = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    struct net_device *ndev = wdev->netdev;
+#endif
+    pndev_priv = netdev_priv(ndev);
+    pnic_info = pndev_priv->nic;
 
     CFG80211_INFO("mac addr: "ZT_MAC_FMT, ZT_MAC_ARG(nic_to_local_addr(pnic_info)));
 
@@ -941,7 +951,7 @@ static zt_s32 _add_key_cb(struct wiphy *wiphy, struct net_device *ndev,
     }
     if (zt_local_cfg_get_work_mode(pnic_info) == ZT_INFRA_MODE)
     {
-        res = cfg80211_sta_set_encryption(ndev, param, param_len);
+        res = zt_cfg80211_sta_set_encryption(ndev, param, param_len);
     }
 #ifdef CFG_ENABLE_AP_MODE
     else if (zt_local_cfg_get_work_mode(pnic_info) == ZT_MASTER_MODE)
@@ -968,7 +978,12 @@ exit :
 
 }
 
-static zt_s32 _get_key_cb(struct wiphy *wiphy, struct net_device *ndev,
+static zt_s32 _get_key_cb(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                          struct wireless_dev *wdev,
+#else
+                          struct net_device *ndev,
+#endif
 /*TODO: android #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 119))*/
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
                           int link_id,
@@ -995,7 +1010,12 @@ static zt_s32 _get_key_cb(struct wiphy *wiphy, struct net_device *ndev,
 }
 
 
-static zt_s32 _del_key_cb(struct wiphy *wiphy, struct net_device *ndev,
+static zt_s32 _del_key_cb(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                          struct wireless_dev *wdev,
+#else
+                          struct net_device *ndev,
+#endif
 /*TODO: android #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 119))*/
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0))
                           int link_id,
@@ -1007,9 +1027,15 @@ static zt_s32 _del_key_cb(struct wiphy *wiphy, struct net_device *ndev,
                           zt_u8 key_index, const zt_u8 *mac_addr)
 #endif
 {
-    ndev_priv_st *pndev_priv = netdev_priv(ndev);
-    nic_info_st *pnic_info = pndev_priv->nic;
-    sec_info_st *psec_info = pnic_info->sec_info;
+    ndev_priv_st *pndev_priv;
+    nic_info_st *pnic_info;
+    sec_info_st *psec_info;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    struct net_device *ndev = wdev->netdev;
+#endif
+    pndev_priv = netdev_priv(ndev);
+    pnic_info = pndev_priv->nic;
+    psec_info = pnic_info->sec_info;
 
     CFG80211_INFO("key_index = %d", key_index);
     CFG80211_INFO("mac addr: "ZT_MAC_FMT, ZT_MAC_ARG(nic_to_local_addr(pnic_info)));
@@ -1064,7 +1090,11 @@ static zt_s32 _set_default_key_cb(struct wiphy *wiphy,
 
 
 static zt_s32 _cfg80211_get_station(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                                    struct wireless_dev *wdev,
+#else
                                     struct net_device *ndev,
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0))
                                     zt_u8 *mac,
 #else
@@ -1084,7 +1114,16 @@ static zt_s32 _cfg80211_get_station(struct wiphy *wiphy,
         CFG80211_DBG("mac is null");
         return -ENOENT;
     }
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    if (wdev->netdev == NULL)
+    {
+        CFG80211_DBG("netdev is null");
+        return -ENOENT;
+    }
+    pndev_priv = netdev_priv(wdev->netdev);
+#else
     pndev_priv = netdev_priv(ndev);
+#endif
     if (NULL == pndev_priv)
     {
         CFG80211_DBG("pndev_priv is null");
@@ -3251,7 +3290,11 @@ void zt_ap_cfg80211_assoc_event_up(nic_info_st *pnic_info,  zt_u8 *passoc_req,
         sinfo.filled = STATION_INFO_ASSOC_REQ_IES;
         sinfo.assoc_req_ies = passoc_req + WLAN_HDR_A3_LEN + ie_offset;
         sinfo.assoc_req_ies_len = assoc_req_len - WLAN_HDR_A3_LEN - ie_offset;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+        cfg80211_new_sta(pnic_info->pwidev, GetAddr2Ptr(passoc_req), &sinfo, GFP_ATOMIC);
+#else
         cfg80211_new_sta(ndev, GetAddr2Ptr(passoc_req), &sinfo, GFP_ATOMIC);
+#endif
 #else
         channel = pcur_network->channel;
         freq = zt_ch_2_freq(channel);
@@ -3293,7 +3336,11 @@ void zt_ap_cfg80211_disassoc_event_up(nic_info_st *pnic_info,
     pwdn_info->state = E_WDN_AP_STATE_READY;
 #endif
 #if defined(ZT_USE_CFG80211_STA_EVENT) || defined(COMPAT_KERNEL_RELEASE)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    cfg80211_del_sta(pnic_info->pwidev, pwdn_info->mac, GFP_ATOMIC);
+#else
     cfg80211_del_sta(ndev, pwdn_info->mac, GFP_ATOMIC);
+#endif
 #else
     channel = pcur_network->channel;
     freq = zt_ch_2_freq(channel);
@@ -3668,6 +3715,9 @@ static zt_s32 add_beacon_cb(struct wiphy *wiphy, struct net_device *ndev,
                             struct beacon_parameters *info)
 {
     zt_s32 ret = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    struct net_device *ndev = wdev->netdev;
+#endif
     ndev_priv_st *pndev_priv = netdev_priv(ndev);
     nic_info_st *pnic_info = pndev_priv->nic;
 
@@ -3799,7 +3849,11 @@ static zt_s32 cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev
 }
 #endif
 static zt_s32 add_station(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                          struct wireless_dev *wdev,
+#else
                           struct net_device *ndev,
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0))
                           zt_u8 *mac,
 #else
@@ -3814,7 +3868,11 @@ static zt_s32 add_station(struct wiphy *wiphy,
 }
 
 static zt_s32 del_station(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                          struct wireless_dev *wdev,
+#else
                           struct net_device *ndev,
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0))
                           zt_u8 *mac
 #elif (LINUX_VERSION_CODE < KERNEL_VERSION(3, 19, 0))
@@ -3827,6 +3885,9 @@ static zt_s32 del_station(struct wiphy *wiphy,
     const zt_u8 *target_mac;
     zt_u16 reason_code;
     wdn_net_info_st *pwdn_info = NULL;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    struct net_device *ndev = wdev->netdev;
+#endif
     ndev_priv_st *pndev_priv = netdev_priv(ndev);
     nic_info_st *pnic_info = pndev_priv->nic;
 
@@ -3901,7 +3962,11 @@ static zt_s32 del_station(struct wiphy *wiphy,
 }
 
 static zt_s32 change_station(struct wiphy *wiphy,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                             struct wireless_dev *wdev,
+#else
                              struct net_device *ndev,
+#endif
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0))
                              zt_u8 *mac,
 #else
@@ -3917,11 +3982,19 @@ static zt_s32 change_station(struct wiphy *wiphy,
 
 
 static zt_s32 dump_station(struct wiphy *wiphy,
-                           struct net_device *ndev, zt_s32 idx, zt_u8 *mac,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+                           struct wireless_dev *wdev,
+#else
+                           struct net_device *ndev,
+#endif
+                           zt_s32 idx, zt_u8 *mac,
                            struct station_info *sinfo)
 {
 
     zt_s32 ret = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(7, 1, 0))
+    struct net_device *ndev = wdev->netdev;
+#endif
     ndev_priv_st *pndev_priv = netdev_priv(ndev);
     nic_info_st *pnic_info = pndev_priv->nic;
 
