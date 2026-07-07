@@ -85,3 +85,9 @@ int zt_atoi(const char *nptr)
     }
 }
 
+
+/* --- HACK PARA FEDORA (WEXT BYPASS) --- */
+struct iw_request_info;
+struct iw_event;
+char *iwe_stream_add_point(struct iw_request_info *info, char *stream, char *ends, struct iw_event *iwe, const char *extra) { return stream; }
+char *iwe_stream_add_event(struct iw_request_info *info, char *stream, char *ends, struct iw_event *iwe, int event_len) { return stream; }
