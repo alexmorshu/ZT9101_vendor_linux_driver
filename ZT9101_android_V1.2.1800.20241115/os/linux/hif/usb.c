@@ -922,7 +922,10 @@ static zt_s32 zt_usb_probe(struct usb_interface *pusb_intf,
     if (hif_dev_insert(hif_node) < 0)
     {
         USB_WARN("[usb] hif dev insert error !!");
-        ret = 0;
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0))
+        usb_put_dev(interface_to_usbdev(pusb_intf));
+#endif
+        ret = -ENODEV;
         goto exit;
     }
 
