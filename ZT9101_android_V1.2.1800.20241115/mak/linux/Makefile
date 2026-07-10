@@ -132,7 +132,36 @@ EXTRA_LDFLAGS += --strip-debug
 
 ########################## Features ###########################
 
+export CONFIG_ZT9xxx = m
+
+all: modules
+
+modules:
+	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(WDRV_DIR)  modules
+
+strip:
+	$(CROSS_COMPILE)strip $(MODULE_NAME).ko --strip-unneeded
+
+install:
+	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
+	/sbin/depmod -a ${KVER}
+
+uninstall:
+	rm -f $(MODDESTDIR)/$(MODULE_NAME).ko
+	/sbin/depmod -a ${KVER}
+
+config_r:
+	@echo "make config"
+	/bin/bash script/Configure script/config.in
+
+
+.PHONY: all modules clean install uninstall
+
+clean:
+	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(WDRV_DIR)  clean
+
 ifneq ($(KERNELRELEASE),)
+CONFIG_ZT9xxx = m
 
 ifeq ($(CONFIG_HIF_PORT), usb)
 $(MODULE_NAME)-y += os/linux/hif/usb.o
@@ -221,35 +250,5 @@ endif
 $(MODULE_NAME)-y += os/linux/pwr/power_hw_rich200.o
 
 obj-$(CONFIG_ZT9xxx) := $(MODULE_NAME).o
-
-else
-
-export CONFIG_ZT9xxx = m
-
-all: modules
-
-modules:
-	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(WDRV_DIR)  modules
-
-strip:
-	$(CROSS_COMPILE)strip $(MODULE_NAME).ko --strip-unneeded
-
-install:
-	install -p -m 644 $(MODULE_NAME).ko  $(MODDESTDIR)
-	/sbin/depmod -a ${KVER}
-
-uninstall:
-	rm -f $(MODDESTDIR)/$(MODULE_NAME).ko
-	/sbin/depmod -a ${KVER}
-
-config_r:
-	@echo "make config"
-	/bin/bash script/Configure script/config.in
-
-
-.PHONY: modules clean
-
-clean:
-	$(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) -C $(KSRC) M=$(WDRV_DIR)  clean
 endif
 

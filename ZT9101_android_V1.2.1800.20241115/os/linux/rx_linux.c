@@ -68,9 +68,7 @@ static inline zt_u8 *pkt_pull(prx_pkt_t prx_pkt, zt_s32 size)
     struct sk_buff *pskb = (struct sk_buff *)prx_pkt->pskb;
     if (size > prx_pkt->len)
     {
-        zt_u8 *p = NULL;
         LOG_E("%s, size = %d, prx_pkt->len=%d", __func__, size, prx_pkt->len);
-        *p = 9;
         return NULL;
     }
     if (pskb)

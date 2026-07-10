@@ -815,7 +815,6 @@ zt_s32 zt_data_queue_mngt_init(void *hif_node)
             {
                 LOG_E("[%s] hif_alloc_buff failed", __func__);
                 zt_free_skb((struct sk_buff *)send_node->buff);
-                zt_kfree(send_node);
             }
             continue;
         }

@@ -354,6 +354,8 @@ int hif_firmware_read_get(zt_u8 firmware_no,
             if (NULL == firmware_info->fw1)
             {
                 LOG_E("firmware1 zt_kzalloc failed");
+                zt_kfree(firmware_info->fw0);
+                firmware_info->fw0 = NULL;
                 zt_os_api_file_close(file);
                 return -3;
             }
@@ -891,20 +893,25 @@ DEV_REINSERT:
 
     /*create hif trx func*/
     LOG_D("<< create hif tx/rx queue >>");
-    zt_data_queue_mngt_init(hif_info);
+    ret = zt_data_queue_mngt_init(hif_info);
+    if (ret)
+    {
+        LOG_E("[%s] zt_data_queue_mngt_init failed", __func__);
+        return -1;
+    }
 
     ret = zt_hif_bulk_enable(hif_info);
     if (ZT_RETURN_FAIL == ret)
     {
         LOG_E("[%s] zt_hif_bulk_enable failed", __func__);
-        return -1;
+        goto err_qmngt;
     }
 
     ret = zt_hif_queue_enable(hif_info);
     if (ZT_RETURN_FAIL == ret)
     {
         LOG_E("[%s] zt_hif_queue_enable failed", __func__);
-        return -1;
+        goto err_bulk;
     }
 
     /*ndev reg*/
@@ -923,7 +930,8 @@ DEV_REINSERT:
             goto DEV_REINSERT;
         } else {
             LOG_E("===>zt_fw_download error, exit!!");
-            return ZT_RETURN_FAIL;
+            ret = ZT_RETURN_FAIL;
+            goto err_queue;
         }
     }
 
@@ -941,7 +949,7 @@ DEV_REINSERT:
         if (ret != 0)
         {
             LOG_E("[%s] ndev_register nic[%d] failed", __func__, i);
-            return -1;
+            goto err_hw;
         }
 
         LOG_D("<< ndev_%d register >>", i);
@@ -949,7 +957,7 @@ DEV_REINSERT:
         if (ret != 0)
         {
             LOG_E("[%s] ndev_register nic[%d] failed", __func__, i);
-            return -1;
+            goto err_nic;
         }
     }
 
@@ -957,13 +965,40 @@ DEV_REINSERT:
     if (zt_proc_init(hif_info) < 0)
     {
         LOG_E("===>zt_proc_init error");
-        return ZT_RETURN_FAIL;
+        ret = ZT_RETURN_FAIL;
+        goto err_reg;
     }
 
     /* close the fw debug info */
     zt_mcu_disable_fw_dbginfo(hif_info->nic_info[0]);
 
     return 0;
+
+err_nic:
+    while (i > 0)
+    {
+        i--;
+        ndev_unregister(hif_info->nic_info[i]);
+        zt_kfree(hif_info->nic_info[i]);
+        hif_info->nic_info[i] = NULL;
+    }
+err_reg:
+    i = nic_num;
+err_hw:
+    while (i > 0)
+    {
+        i--;
+        ndev_unregister(hif_info->nic_info[i]);
+        zt_kfree(hif_info->nic_info[i]);
+        hif_info->nic_info[i] = NULL;
+    }
+err_queue:
+    zt_hif_queue_disable(hif_info);
+err_bulk:
+    zt_hif_bulk_disable(hif_info);
+err_qmngt:
+    zt_data_queue_mngt_term(hif_info);
+    return ret;
 }
 
 
